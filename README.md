@@ -1,2 +1,2 @@
-# scripts_utils
+# scripts-utils
 Some useful scripts, interesting to have
