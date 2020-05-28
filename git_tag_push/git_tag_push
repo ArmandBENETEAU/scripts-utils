@@ -1,0 +1,125 @@
+#!/bin/bash
+
+# This script allows to easily do a tag and push at the same time inside a git repository.
+# In order to do so, the modifications to push must have been staged correctly (git commit)
+
+echo ""
+echo "*******************************************"
+echo "******* Customized GIT push and tag *******"
+echo "*******************************************"
+echo ""
+
+# Check that we have the right number of arguments
+if [ "$#" -ne 2 ]
+then
+  echo "Usage: git_tag_push <new_tag> <version_variable_in_code>" >&2
+  exit 1
+fi
+
+# Firstly, get the current repertory from which is called the script
+curent_dir=$PWD
+
+# Then get the tag to push
+new_tag="$1"
+
+# Get the variable name in the code containing the version
+version_in_code="$2"
+
+# Check that the working directory is a git repository
+if [ -d .git ]
+then
+  echo "SUCCESS ==> CHECK GIT REPOSITORY"
+  echo ""
+else
+  echo "FAILURE ==> CHECK GIT REPOSITORY"
+  echo ">> We are not in a GIT repository, the script cannot be run"
+  echo ""
+  exit 1
+fi
+
+# Now check that the version in the spec file has been updated
+# First: find the path to the spec file
+spec_file=$(find . -name "*.spec")
+if [ -z $spec_file ]
+then
+  echo "WARNING ==> CHECK SPEC FILE : No spec file found in the project"
+  echo ""
+else
+  echo "SUCCESS ==> CHECK SPEC FILE"
+  echo ">> Path to spec file: $spec_file"
+  echo ""
+
+  # Then: Get the version inside the spec file
+  version_line=$(grep Version: $spec_file)
+  # Check that version is the same as the one specified in the command line
+  if [[ $version_line == *"$new_tag"* ]]
+  then
+    echo "SUCCESS ==> CHECK SPEC FILE VERSION"
+    echo ">> Version $new_tag correctly setted in spec file"
+    echo ""
+  else
+    echo "FAILURE ==> CHECK SPEC FILE VERSION"
+    echo ">> The version in the spec file does not match the new tag value"
+    echo ">> New tag value: $new_tag"
+    echo ">> Version line found in spec file: \"$version_line\""
+    echo ""
+    exit 1
+  fi
+fi
+
+# Now check that the version in the code has been updated
+code_version_line=$(grep -rIn "^$version_in_code.*=")
+if [ -z "$code_version_line" ]
+then
+  echo "FAILURE ==> CHECK CODE VERSION"
+  echo ">> The version variable has not been found in the code"
+  echo ""
+  exit 1
+fi
+
+# Get only the text inside the code file
+code_version_text=`echo "$code_version_line" | cut -f3- -d ":"`
+
+# Check that version is the same as the one specified in the command line
+if [[ $code_version_text == *"$new_tag"* ]]
+then
+  echo "SUCCESS ==> CHECK CODE VERSION"
+  echo ">> Version $new_tag correctly setted in code file"
+  echo ""
+else
+  echo "FAILURE ==> CHECK CODE VERSION"
+  echo ">> The version in the code does not match the new tag value"
+  echo ">> New tag value: $new_tag"
+  echo ">> Version line found in code file: \"$code_version_line\""
+  echo ""
+  exit 1
+fi
+
+# Check if there are some changes not staged
+git diff --exit-code
+if [ $? -ne 0 ]
+then
+  echo ""
+  echo "==============================================="
+  echo "FAILURE ==> CHECK NOT STAGED CODE"
+  echo ">> The repository contains some unstaged code"
+  echo ">> Please set a tag on a clean repository"
+  echo ""
+  exit 1
+else
+  echo "SUCCESS ==> CHECK NOT STAGED CODE"
+  echo ""
+fi
+
+# Finally: create the tag : it will open a prompt to write the tag message
+git tag -a "$new_tag" HEAD
+
+# Finally push the tag and eventually some files staged
+git push
+git push origin tag $new_tag
+
+echo ""
+echo "*******************************************"
+echo "************** END OF SCRIPT **************"
+echo "*******************************************"
+echo ""
