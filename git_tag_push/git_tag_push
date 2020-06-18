@@ -10,9 +10,9 @@ echo "*******************************************"
 echo ""
 
 # Check that we have the right number of arguments
-if [ "$#" -ne 2 ]
+if [ "$#" -lt 2 ]
 then
-  echo "Usage: git_tag_push <new_tag> <version_variable_in_code>" >&2
+  echo "Usage: git_tag_push <NEW_TAG> <CHECK_CODE> <VERSION_VAR_IN_CODE>" >&2
   exit 1
 fi
 
@@ -22,8 +22,18 @@ curent_dir=$PWD
 # Then get the tag to push
 new_tag="$1"
 
-# Get the variable name in the code containing the version
-version_in_code="$2"
+# Get the variable telling us if we need to check the code
+check_code="$2"
+
+if [ $check_code = "true" ]
+then
+  # Get the variable name in the code containing the version
+  version_in_code="$3"
+elif [ $check_code != "false" ]
+then
+  echo "The parameter <CHECK_CODE> should be \"true\" or \"false\"" >&2
+  exit 1
+fi
 
 # Check that the working directory is a git repository
 if [ -d .git ]
@@ -37,62 +47,65 @@ else
   exit 1
 fi
 
-# Now check that the version in the spec file has been updated
-# First: find the path to the spec file
-spec_file=$(find . -name "*.spec")
-if [ -z $spec_file ]
+if [ $check_code = "true" ]
 then
-  echo "WARNING ==> CHECK SPEC FILE : No spec file found in the project"
-  echo ""
-else
-  echo "SUCCESS ==> CHECK SPEC FILE"
-  echo ">> Path to spec file: $spec_file"
-  echo ""
-
-  # Then: Get the version inside the spec file
-  version_line=$(grep Version: $spec_file)
-  # Check that version is the same as the one specified in the command line
-  if [[ $version_line == *"$new_tag"* ]]
+  # Now check that the version in the spec file has been updated
+  # First: find the path to the spec file
+  spec_file=$(find . -name "*.spec")
+  if [ -z $spec_file ]
   then
-    echo "SUCCESS ==> CHECK SPEC FILE VERSION"
-    echo ">> Version $new_tag correctly setted in spec file"
+    echo "WARNING ==> CHECK SPEC FILE : No spec file found in the project"
     echo ""
   else
-    echo "FAILURE ==> CHECK SPEC FILE VERSION"
-    echo ">> The version in the spec file does not match the new tag value"
-    echo ">> New tag value: $new_tag"
-    echo ">> Version line found in spec file: \"$version_line\""
+    echo "SUCCESS ==> CHECK SPEC FILE"
+    echo ">> Path to spec file: $spec_file"
+    echo ""
+
+    # Then: Get the version inside the spec file
+    version_line=$(grep Version: $spec_file)
+    # Check that version is the same as the one specified in the command line
+    if [[ $version_line == *"$new_tag"* ]]
+    then
+      echo "SUCCESS ==> CHECK SPEC FILE VERSION"
+      echo ">> Version $new_tag correctly setted in spec file"
+      echo ""
+    else
+      echo "FAILURE ==> CHECK SPEC FILE VERSION"
+      echo ">> The version in the spec file does not match the new tag value"
+      echo ">> New tag value: $new_tag"
+      echo ">> Version line found in spec file: \"$version_line\""
+      echo ""
+      exit 1
+    fi
+  fi
+
+  # Now check that the version in the code has been updated
+  code_version_line=$(grep -rIn "^$version_in_code.*=")
+  if [ -z "$code_version_line" ]
+  then
+    echo "FAILURE ==> CHECK CODE VERSION"
+    echo ">> The version variable has not been found in the code"
     echo ""
     exit 1
   fi
-fi
 
-# Now check that the version in the code has been updated
-code_version_line=$(grep -rIn "^$version_in_code.*=")
-if [ -z "$code_version_line" ]
-then
-  echo "FAILURE ==> CHECK CODE VERSION"
-  echo ">> The version variable has not been found in the code"
-  echo ""
-  exit 1
-fi
+  # Get only the text inside the code file
+  code_version_text=`echo "$code_version_line" | cut -f3- -d ":"`
 
-# Get only the text inside the code file
-code_version_text=`echo "$code_version_line" | cut -f3- -d ":"`
-
-# Check that version is the same as the one specified in the command line
-if [[ $code_version_text == *"$new_tag"* ]]
-then
-  echo "SUCCESS ==> CHECK CODE VERSION"
-  echo ">> Version $new_tag correctly setted in code file"
-  echo ""
-else
-  echo "FAILURE ==> CHECK CODE VERSION"
-  echo ">> The version in the code does not match the new tag value"
-  echo ">> New tag value: $new_tag"
-  echo ">> Version line found in code file: \"$code_version_line\""
-  echo ""
-  exit 1
+  # Check that version is the same as the one specified in the command line
+  if [[ $code_version_text == *"$new_tag"* ]]
+  then
+    echo "SUCCESS ==> CHECK CODE VERSION"
+    echo ">> Version $new_tag correctly setted in code file"
+    echo ""
+  else
+    echo "FAILURE ==> CHECK CODE VERSION"
+    echo ">> The version in the code does not match the new tag value"
+    echo ">> New tag value: $new_tag"
+    echo ">> Version line found in code file: \"$code_version_line\""
+    echo ""
+    exit 1
+  fi
 fi
 
 # Check if there are some changes not staged
