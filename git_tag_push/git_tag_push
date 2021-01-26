@@ -125,7 +125,7 @@ else
 fi
 
 # Finally: create the tag : it will open a prompt to write the tag message
-git tag -a "$new_tag" HEAD
+git tag -a "$new_tag"
 
 # Finally push the tag and eventually some files staged
 git push
